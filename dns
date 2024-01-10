@@ -1,0 +1,110 @@
+# Install bind dns package
+$ dnf install bind -y
+
+# Edit /etc/named.conf
+# listen on port 53 should be set to `any`
+`listen-on port 53 { any; };`
+# --------------------------------------------
+
+# Comment out v6 line to disallow ipv6
+# listen-on-v6 port 53 { ::1;  };
+# --------------------------------------------
+
+# Allowing querying to any
+`allow-query { any; };`
+# --------------------------------------------
+
+# Recursion:
+# Under line `recursion yes;` add line 
+`allow-recursion { 10.0.0.0/24; };`
+# --------------------------------------------
+
+# add zone for myvspj.cz domain:
+`
+zone "myvspj.cz" IN {
+	type master;
+	file "myvspj.cz";
+};
+`
+
+# download zone file and add it to /var/named/ directory
+$ wget https://alpha.kts.vspj.cz/~apribyl/myvspj.cz.txt
+$ mv myvspj.cz.txt /var/named/myvspj.cz
+
+# --------------------------------------------
+#
+# allow dns in firewall
+$ firewall-cmd --permanent --add-service=dns --zone=public
+$ firewall-cmd --reload
+# --------------------------------------------
+
+# restart named 
+$ systemctl restart named
+# --------------------------------------------
+#
+# use local dns as primary dns server
+`
+option domain-name-servers 10.0.0.1;
+`
+$ systemctl restart dhcpd
+
+# ============================================
+# Postfix Email server
+$ dnf install postfix s-nail -y
+
+# Edit content of /etc/postfix/main.cf
+
+`
+myhostname=mail.myvspj.cz (must be same like MX value for myvspj.cz domain)
+mydomain=myvspj.cz
+myorigin=$mydomain
+inet_interfaces=all (we need to receive emails on all interfaces)
+inet_protocols=ipv4
+mydestination must contain $mydomain - last variant
+mynetworks (10.0.0.0/24, 127.0.0.0/8)
+whre is alias_maps and what is inside
+home_mailbox=Maildir/ (why not mailbox)
+`
+
+# Edit /etc/aliases to who will get the root's email 
+`
+root: eit
+`
+
+# create new db file
+$ postaliases /etc/aliases
+$ systemctl restart postfix
+
+# Enable in firewall
+$ firewall-cmd --permanent --zone=public --add-service=smtp
+$ firewall-cmd --reload
+
+# Test email
+$ echo "This is a test email body for mr.root" | mail -s "Test Subject 01" eit
+
+# In /home/eit/Maildir/new should appear new email message
+# --------------------------------------------------------
+# IMAP
+#
+$ dnf install dovecot -y
+# Edit /etc/dovecot.conf
+`
+protocols = imap
+listen = *
+login_greeting change to something more vague
+login_trusted_networks = 10.0.0.0/24 127.0.0.0/8
+optionally in conf.d/10-auth.conf set disable_plain_text_auth = no (thie enables plain text auth from everywhere)
+optionally in conf.d/20-imap.conf set imap_client_workarounds options for non-standard behavior for mail clients Thunderbird and Outlook
+enable service, start service
+`
+
+# allow services in firewall
+$ firewall-cmd --permanent --zone=public --add-service=imap
+$ firewall-cmd --permanent --zone=public --add-service=pop3
+$ firewall-cmd --permanent --zone=public --add-service=imaps
+$ firewall-cmd --permanent --zone=public --add-service=pop3s
+$ firewall-cmd --reload
+# --------------------------------------------------------------
+# installation of Thunderbird client in win2016server
+
+

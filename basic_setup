@@ -1,0 +1,79 @@
+1. Install AlmaLinux on Virtualization software (HyperV, VirtualBox, VMWare)
+	- CPU: 2,
+	- RAM: 2048MB,
+	- Network adapters:
+		- NAT Network (enp0s3) - this is for internet access
+		- Internal Network (enps08) - this is a gateway for Win2016Servers
+2. Install Win2016 Server
+	- CPU: 4,
+	- RAM: 4096MB,
+		- Internal Network
+	- Potentional problem: "Windows cannot find the Microsof Software License Terms"
+	- Solution: Don't mount the ISO during the creating of Virtual Machine, mount later
+
+3. Configuration of NAT network
+	- Update the system with `dnf update`
+	- Install config and control tools 
+		`dnf install net-tools vim wget`
+	- Set static IP to 10.0.2.100 for internet access and ssh access
+		$ nmcli connection modify enp0s3 ipv4.method manual ipv4.addresses 10.0.2.100/24 ipv4.gateway 10.0.2.1
+warning!!! 10.0.2.1-2 cannot act as a gateway in virtualbox for some reason, use 10.0.2.3 instead
+		restart NetworkManager + down & up enp0s3
+		$ systemctl restart NetworkManager
+		$ ifconfig down enp0s3
+		$ ifconfig up enp0s3
+
+		- In VBox add port forwarding rule
+			HIP:127.0.0.1 HP:22100 GIP:10.0.2.100 GP: 22
+		- Allow root ssh login:
+			PerminRootLogin yes
+			PubkeyAuthentication yes
+			restart sshd
+		- enable sshd with custom port 30052
+			in /etc/ssh/sshd_config:
+				uncomment line #Port 22
+				change it to Port 30050
+			SELinux will have a problem with non-standart ports, so we need to temporarily disable SELinux with $ setenforce 0
+			restart sshd
+			$ sudo dnf install policycoreutils-python-utils
+			$ audit2allow -a -M mysshd
+			$ setmodule -i mysshd.pp
+			$ setenforce 1
+			
+		- add ssh no-login access
+			- create keypair: $ ssh-keygen; choose location
+			- transfer pubkey to remote machine:
+				$ ssh-copy-id -p 22100 -i <location>root@127.0.0.1
+	- Set static IP to 10.0.0.1 for gateway 
+		$ nmcli connection modify enp0s8 ipv4.method manual ipv4.addresses 10.0.0.1/24 ipv4.gateway 10.0.2.100
+	- 
+
+4. Router with NAT
+	- in /etc/sysctl.conf add line "net.ipv4.ip_forward=1"
+	- allow masquerading in firewall-cmd:
+		- $ firewall-cmd --permanent --zone=public --add-masquerade
+		- $ systemctl restart firewalld
+	- install dhcp: $ dnf install dhcp-server
+	- $ wget https://alpha.kts.vspj.cz/~apribyl/dhcpd.txt and rename to dhcpd.conf 
+	- set up dns to 8.8.8.8, 8.8.4.4 or leave for school endpoints
+
+		authoritative;
+		default-lease-time 86400;
+		max-lease-time 259200;
+		option domain-name-servers 192.168.50.165, 192.168.50.166, 192.168.50.167;
+		# option domain-name-servers 8.8.8.8, 8.8.4.4; // for home usage
+		option domain-name "test";
+
+		subnet 10.0.0.0 netmask 255.255.255.0 {
+		  range 10.0.0.100 10.0.0.200;
+		  option broadcast-address 10.0.0.255;
+		  option routers 10.0.0.1;
+		}
+
+	- open firewall port
+		- $ firewall-cmd --permanent --zone=public --add-service=dhcp
+		- $ firewall-cmd --reload
+
+
+		
+
