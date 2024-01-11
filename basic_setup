@@ -23,6 +23,9 @@ warning!!! 10.0.2.1-2 cannot act as a gateway in virtualbox for some reason, use
 		$ ifconfig down enp0s3
 		$ ifconfig up enp0s3
 
+		# try ping now!!!
+		# in case of no connection, check /etc/resolv.conf
+
 		- In VBox add port forwarding rule
 			HIP:127.0.0.1 HP:22100 GIP:10.0.2.100 GP: 22
 		- Allow root ssh login:
@@ -39,6 +42,8 @@ warning!!! 10.0.2.1-2 cannot act as a gateway in virtualbox for some reason, use
 			$ audit2allow -a -M mysshd
 			$ setmodule -i mysshd.pp
 			$ setenforce 1
+			# if above does not work, add
+			$ semanage port -a -t ssh_port_t -p tcp 30052
 			
 		- add ssh no-login access
 			- create keypair: $ ssh-keygen; choose location
