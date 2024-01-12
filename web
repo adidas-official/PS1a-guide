@@ -1,0 +1,36 @@
+# install, allow in firewall and run apache
+$ dnf install httpd
+$ firewall-cmd --permanent --zone=public --add-service=http
+$ firewall-cmd --reload
+$ systemctl start httpd
+$ systemctl enable httpd
+
+# allow userdirs
+# edit /etc/httpd/conf.d/userdir.conf
+`
+#UserDir disable
+UserDir public_html
+`
+# create folder public_html in user home
+$ mkdir /home/user/public_html
+$ chmod 751 /home/user
+# allow selinux to execute users homedir
+$ setsebool -P httpd_enable_homedirs = 1
+
+# Virtual webs
+# ------------
+# Create /etc/httpd/conf.d/virtualhost.conf with:
+`
+<VirtualHost *:80>
+	DocumentRoot "/var/www/html"
+	# Other directives here
+</VirtualHost>
+
+<VirtualHost *:80>
+	DocumentRoot "/var/www/wwwtest"
+	ServerName wwwtest.myvspj.cz
+	# Other directives here
+</VirtualHost>
+`
+# and restart httpd
+# Then add pages to /var/www/wwwtest
